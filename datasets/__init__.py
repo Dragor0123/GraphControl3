@@ -5,7 +5,7 @@ import torch
 import os
 import numpy as np
 
-from .dataset import Amazon, Coauthor, Airports, CitationFull, HindexDataset
+from .dataset import Amazon, Coauthor, Airports, CitationFull, HindexDataset, WikipediaNetwork, Actor
 from utils.random import reset_random_seed
 from utils.transforms import obtain_attributes
 
@@ -18,17 +18,26 @@ dataset_dict = {
     'europe': Airports,
     'DBLP': CitationFull,
     'Cora_ML': CitationFull,
-    'Hindex': HindexDataset
+    'Hindex': HindexDataset,
+    'Chameleon': WikipediaNetwork,
+    'Squirrel': WikipediaNetwork,
+    'Actor': Actor
 }
 
 PATH = './datasets/data'
 
 def load_dataset(dataset_name, trans=None):
-    if dataset_name in ['Hindex']:
+    if dataset_name in ['Hindex', 'Actor']:
         if trans == None:
             return dataset_dict[dataset_name](root=f'{PATH}/{dataset_name}')
         else:
             return dataset_dict[dataset_name](root=f'{PATH}/{dataset_name}', transform=T.Compose([trans]))
+    elif dataset_name in ['Chameleon', 'Squirrel']:
+        wiki_name = dataset_name.lower()
+        if trans == None:
+            return dataset_dict[dataset_name](root=PATH, name=wiki_name)
+        else:
+            return dataset_dict[dataset_name](root=PATH, name=wiki_name, transform=T.Compose([trans]))
     else:
         if trans == None:
             return dataset_dict[dataset_name](root=PATH, name=dataset_name)
@@ -40,8 +49,11 @@ class NodeDataset:
     def __init__(self, dataset_name, trans=None, n_seeds=[0]) -> None:
         self.path = PATH
         self.dataset_name = dataset_name
-        if dataset_name in ['Hindex']:
+        if dataset_name in ['Hindex', 'Actor']:
             self.dataset = dataset_dict[dataset_name](root=f'{self.path}/{dataset_name}', transform=trans)
+        elif dataset_name in ['Chameleon', 'Squirrel']:
+            wiki_name = dataset_name.lower()
+            self.dataset = dataset_dict[dataset_name](root=f'{self.path}', name=wiki_name, transform=trans)
         else:
             self.dataset = dataset_dict[dataset_name](root=f'{self.path}', name=dataset_name, transform=trans)
 

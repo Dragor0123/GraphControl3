@@ -3,12 +3,37 @@ from torch_geometric.utils import to_undirected, remove_self_loops, to_dense_adj
 import torch.nn.functional as F
 import torch
 import scipy
+import scipy.sparse as sp
+import numpy as np
 
 from .normalize import similarity, get_laplacian_matrix
 
-def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
+
+def _build_khop_mask(edge_index, num_nodes, k):
+    """
+    k-hop 이내에 있는 노드 쌍만 1인 dense mask를 반환한다.
+    scipy sparse를 이용해 A + A^2 + ... + A^k > 0 을 효율적으로 계산한다.
+    """
+    row = edge_index[0].cpu().numpy()
+    col = edge_index[1].cpu().numpy()
+    A = sp.csr_matrix((np.ones(len(row)), (row, col)), shape=(num_nodes, num_nodes))
+
+    reach = A.copy()
+    power = A.copy()
+    for _ in range(k - 1):
+        power = power.dot(A)
+        reach = reach + power
+
+    mask = torch.tensor((reach.toarray() > 0), dtype=torch.float32)
+    # self-loop 추가: baseline과 동일하게 자기 자신과의 similarity 유지
+    mask.fill_diagonal_(1.0)
+    
+    return mask
+
+
+def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32, sim_khop=0):
     save_node_border = 30000
-        
+
     if use_adj:
         # to undirected and remove self-loop
         edges = to_undirected(data.edge_index)
@@ -16,9 +41,15 @@ def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
         tmp = to_dense_adj(edges)[0]
     else:
         tmp = similarity(data.x, data.x)
-        
+
+        # k-hop adjacency mask: 원본 graph에서 k-hop 이내인 쌍만 similarity 고려
+        if sim_khop > 0:
+            khop_mask = _build_khop_mask(data.edge_index, tmp.shape[0], sim_khop)
+            tmp = tmp * khop_mask.to(tmp.device)
+
         # discretize the similarity matrix by threshold
         tmp = torch.where(tmp>threshold, 1.0, 0.0)
+        
 
     tmp = get_laplacian_matrix(tmp)
     if tmp.shape[0] > save_node_border:

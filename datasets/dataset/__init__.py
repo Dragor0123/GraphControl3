@@ -1,2 +1,2 @@
 from .Hindex import HindexDataset
-from torch_geometric.datasets import Amazon, Coauthor, Airports, CitationFull
+from torch_geometric.datasets import Amazon, Coauthor, Airports, CitationFull, WikipediaNetwork, Actor

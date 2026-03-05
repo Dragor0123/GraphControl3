@@ -96,7 +96,9 @@ def main(config):
     # For large graph, we use cpu to preprocess it rather than gpu because of OOM problem.
     if dataset_obj.num_nodes < 30000:
         dataset_obj.to(device)
-    x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold).to(device)
+    
+    # labels = dataset_obj.data.y
+    x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold, sim_khop=config.sim_khop).to(device)
     
     dataset_obj.to('cpu') # Otherwise the deepcopy will raise an error
     num_node_features = config.num_dim
@@ -109,6 +111,9 @@ def main(config):
     for i, seed in enumerate(config.seeds):
         reset_random_seed(seed)
         if dataset_obj.random_split:
+            dataset_obj.data.train_mask = train_masks[:, seed]
+            dataset_obj.data.test_mask = test_masks[:, seed]
+        elif dataset_obj.data.train_mask.dim() > 1:
             dataset_obj.data.train_mask = train_masks[:, seed]
             dataset_obj.data.test_mask = test_masks[:, seed]
         
