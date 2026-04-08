@@ -1,0 +1,20 @@
+{
+  "dataset": "DBLP",
+  "type": "Homophilic",
+  "num_nodes": 17716,
+  "delta": 0.15,
+  "two_hop_candidates": 696451,
+  "A_prime": {
+    "total_edges": 9780394,
+    "homo_edges": 4822573,
+    "hetero_edges": 4957821,
+    "h_ratio": 0.49308575912176955
+  },
+  "A_double_prime": {
+    "total_edges": 179008,
+    "homo_edges": 130133,
+    "hetero_edges": 48875,
+    "h_ratio": 0.7269675098319628
+  },
+  "delta_h_ratio": 0.23388175071019324
+}

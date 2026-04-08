@@ -6,19 +6,50 @@ import scipy
 
 from .normalize import similarity, get_laplacian_matrix
 
-def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
+
+def compute_stats(adj_matrix: torch.Tensor, labels: torch.Tensor):
+    """
+    adj_matrix: [N, N] symmetric binary matrix (no self-loops)
+    labels: [N] node label tensor
+    Returns: (total_edges, homo_edges, hetero_edges, h_ratio)
+    """
+    triu = torch.triu(adj_matrix, diagonal=1)
+    edges = triu.nonzero(as_tuple=False)  # [E, 2]
+    total = edges.shape[0]
+
+    if total == 0:
+        return 0, 0, 0, 0.0
+
+    src_labels = labels[edges[:, 0]]
+    dst_labels = labels[edges[:, 1]]
+    homo = int((src_labels == dst_labels).sum().item())
+    hetero = total - homo
+    h_ratio = homo / total
+    return total, homo, hetero, h_ratio
+
+
+def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32, labels=None):
     save_node_border = 30000
+
+    ## if use_adj:
+    # to undirected and remove self-loop
+    edges = to_undirected(data.edge_index)
+    edges, _ = remove_self_loops(edges)
+    tmp = to_dense_adj(edges)[0]
+    if labels is not None:
+        label_mask = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+        tmp = tmp * label_mask
         
-    if use_adj:
-        # to undirected and remove self-loop
-        edges = to_undirected(data.edge_index)
-        edges, _ = remove_self_loops(edges)
-        tmp = to_dense_adj(edges)[0]
-    else:
-        tmp = similarity(data.x, data.x)
-        
-        # discretize the similarity matrix by threshold
-        tmp = torch.where(tmp>threshold, 1.0, 0.0)
+    # else:
+    #     tmp = similarity(data.x, data.x)
+
+    #     # discretize the similarity matrix by threshold
+    #     tmp = torch.where(tmp > threshold, 1.0, 0.0)
+    #     tmp.fill_diagonal_(0)
+
+    # total, homo, hetero, h_ratio = compute_stats(tmp, labels)
+    # print(f"[obtain_attributes | use_adj={use_adj}, threshold={threshold}] total={total}  homo={homo}  hetero={hetero}  ratio={h_ratio:.4f}")
+    # ---------------------------------------------------------------------------
 
     tmp = get_laplacian_matrix(tmp)
     if tmp.shape[0] > save_node_border:

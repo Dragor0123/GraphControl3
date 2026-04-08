@@ -97,7 +97,9 @@ def main(config):
     if dataset_obj.num_nodes < 30000:
         dataset_obj.to(device)
     
-    x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold).to(device)
+    _labels = dataset_obj.data.y
+    # obtain_attributes(dataset_obj.data, use_adj=True,  threshold=config.threshold, labels=_labels)  # stats only
+    x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold, labels=_labels).to(device)
     
     dataset_obj.to('cpu') # Otherwise the deepcopy will raise an error
     num_node_features = config.num_dim

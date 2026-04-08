@@ -116,7 +116,7 @@ class NodeDataset:
     def replace_node_attributes(self, use_adj, threshold, num_dim):
         self.num_node_features = num_dim
         self.data.x = obtain_attributes(self.data, use_adj, threshold, num_dim)
-        
+
     def obtain_node_attributes(self, use_adj, threshold=0.1, num_dim=32):
         return obtain_attributes(self.data, use_adj, threshold, num_dim)
     

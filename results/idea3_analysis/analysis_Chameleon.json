@@ -1,0 +1,20 @@
+{
+  "dataset": "Chameleon",
+  "type": "Heterophilic",
+  "num_nodes": 2277,
+  "delta": 0.15,
+  "two_hop_candidates": 604682,
+  "A_prime": {
+    "total_edges": 22304,
+    "homo_edges": 6014,
+    "hetero_edges": 16290,
+    "h_ratio": 0.2696377331420373
+  },
+  "A_double_prime": {
+    "total_edges": 9974,
+    "homo_edges": 3778,
+    "hetero_edges": 6196,
+    "h_ratio": 0.37878484058552236
+  },
+  "delta_h_ratio": 0.10914710744348505
+}

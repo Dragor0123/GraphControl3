@@ -1,0 +1,20 @@
+{
+  "dataset": "Squirrel",
+  "type": "Heterophilic",
+  "num_nodes": 5201,
+  "delta": 0.15,
+  "two_hop_candidates": 4201886,
+  "A_prime": {
+    "total_edges": 164683,
+    "homo_edges": 33377,
+    "hetero_edges": 131306,
+    "h_ratio": 0.2026742286696259
+  },
+  "A_double_prime": {
+    "total_edges": 73207,
+    "homo_edges": 14651,
+    "hetero_edges": 58556,
+    "h_ratio": 0.2001311350007513
+  },
+  "delta_h_ratio": -0.002543093668874591
+}

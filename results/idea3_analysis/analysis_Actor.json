@@ -1,0 +1,20 @@
+{
+  "dataset": "Actor",
+  "type": "Heterophilic",
+  "num_nodes": 7600,
+  "delta": 0.15,
+  "two_hop_candidates": 1264568,
+  "A_prime": {
+    "total_edges": 14226956,
+    "homo_edges": 2968556,
+    "hetero_edges": 11258400,
+    "h_ratio": 0.20865714352388523
+  },
+  "A_double_prime": {
+    "total_edges": 609852,
+    "homo_edges": 125119,
+    "hetero_edges": 484733,
+    "h_ratio": 0.20516289198034934
+  },
+  "delta_h_ratio": -0.0034942515435358867
+}
