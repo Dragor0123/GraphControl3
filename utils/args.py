@@ -28,10 +28,10 @@ class Arguments:
         
         # Processing node attributes
         self.parser.add_argument('--use_adj', action='store_true', help="use eigen-vectors of adjacent matrix as node attributes")
-        self.parser.add_argument('--threshold', type=float, help="the threshold for discreting similarity matrix", default=0.15)
+        self.parser.add_argument('--threshold', type=float, help="the threshold for discreting similarity matrix", default=0.17) #0.15 for Squirrel, otherwise 0.17
         self.parser.add_argument('--num_dim', type=int, help="the number of replaced node attributes", default=32)     
         # self.parser.add_argument('--ad_aug', action='store_true', help="adversarial augmentation")
-        self.parser.add_argument('--restart', type=float, help="the restart ratio of random walking", default=0.3)
+        self.parser.add_argument('--restart', type=float, help="the restart ratio of random walking", default=0.8) #0.3
         self.parser.add_argument('--walk_steps', type=int, help="the number of random walk's steps", default=256)
 
         # Node2vec config

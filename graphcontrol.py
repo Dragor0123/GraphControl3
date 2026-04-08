@@ -111,6 +111,9 @@ def main(config):
         if dataset_obj.random_split:
             dataset_obj.data.train_mask = train_masks[:, seed]
             dataset_obj.data.test_mask = test_masks[:, seed]
+        elif dataset_obj.data.train_mask.dim() > 1:
+            dataset_obj.data.train_mask = train_masks[:, seed]
+            dataset_obj.data.test_mask = test_masks[:, seed]
         
         train_loader, test_loader = preprocess(config, dataset_obj, device)
         
