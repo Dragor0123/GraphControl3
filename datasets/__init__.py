@@ -32,7 +32,7 @@ def load_dataset(dataset_name, trans=None):
             return dataset_dict[dataset_name](root=f'{PATH}/{dataset_name}')
         else:
             return dataset_dict[dataset_name](root=f'{PATH}/{dataset_name}', transform=T.Compose([trans]))
-    elif dataset_name in ['Chameleon', 'Squirrel']
+    elif dataset_name in ['Chameleon', 'Squirrel']:
         wikie_name = dataset_name.lower()
         if trans == None:
             return dataset_dict[dataset_name](root=PATH, name=wiki_name)

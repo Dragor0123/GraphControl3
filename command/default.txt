@@ -1,0 +1,1 @@
+python graphcontrol.py --model GCC_GraphControl --dataset Cora_ML --lr 0.5 --optimizer adamw --threshold 0.17 --use_adj  --seeds 0 1 2 3 4
