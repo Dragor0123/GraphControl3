@@ -1,0 +1,2 @@
+Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
+Actor,-0.3564,0.1236,0.0196,10.3778,4.486,11.0302,1.063

@@ -1,0 +1,4 @@
+Quartile,N,NormRatio_Mean,CosFrozen_Mean,CosControl_Mean,Acc_Frozen,Acc_Control,Acc_Combined
+Q1,10620,0.8694,-0.4106,0.99,0.5116,0.9282,0.9315
+Q3,1365,0.8609,-0.3939,0.9883,0.5612,0.8615,0.8674
+Q4,3960,0.8374,-0.4353,0.9841,0.2328,0.4697,0.4636

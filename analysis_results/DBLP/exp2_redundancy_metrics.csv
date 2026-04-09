@@ -1,0 +1,2 @@
+Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
+DBLP,-0.2605,0.1464,0.0888,25.5826,16.756,39.3652,1.5395

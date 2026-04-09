@@ -1,0 +1,2 @@
+Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
+Squirrel,-0.4161,0.1232,0.1164,9.7696,4.15,9.0218,0.926

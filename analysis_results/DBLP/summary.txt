@@ -1,0 +1,23 @@
+GraphControl Branch Complementarity Analysis — DBLP
+============================================================
+
+Experiment 1: Per-Branch Classification Performance
+(Aggregated over all seeds)
+Dataset  Homophily_Ratio  Frozen_Acc  Control_Acc  Combined_Acc  Frozen_Acc_Std  Control_Acc_Std  Combined_Acc_Std
+   DBLP           0.8279      0.4108       0.8091        0.8094          0.0814           0.0044            0.0058
+
+Experiment 2: Representation Redundancy Metrics
+(Aggregated over all seeds)
+Dataset  Cosine_Mean  Cosine_Std    CKA  ERank_Frozen  ERank_Control  ERank_Concat  ERank_Ratio
+   DBLP      -0.2605      0.1464 0.0888       25.5826         16.756       39.3652       1.5395
+
+Interpretation guide:
+  CKA → 1.0       : branches are representationally similar (redundant)
+  CKA → 0.0       : branches are representationally diverse (complementary)
+  ERank_Ratio > 1.2: concatenated space is richer (complementary signal)
+  Cosine_Mean > 0.9: largely aligned representations
+  RQ_Diff > 0      : frozen branch captures higher-freq (heterophilic) signals
+  RQ_Diff < 0      : control branch captures higher-freq signals
+
+See exp3_homophily_contribution/ for quartile analysis plots.
+See exp4_spectral_analysis/ for Rayleigh Quotient histograms & scatter plots.

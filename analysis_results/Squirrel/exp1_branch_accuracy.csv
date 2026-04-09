@@ -1,0 +1,2 @@
+Dataset,Homophily_Ratio,Frozen_Acc,Control_Acc,Combined_Acc,Frozen_Acc_Std,Control_Acc_Std,Combined_Acc_Std
+Squirrel,0.2224,0.2017,0.2849,0.2934,0.006,0.0135,0.0078

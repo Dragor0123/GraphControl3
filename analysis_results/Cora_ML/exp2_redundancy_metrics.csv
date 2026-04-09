@@ -1,2 +1,2 @@
 Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
-Cora_ML,0.7168,0.0561,0.2877,10.333,4.068,10.96,1.0607
+Cora_ML,-0.1043,0.2154,0.0152,10.4072,6.0418,7.7118,0.7409

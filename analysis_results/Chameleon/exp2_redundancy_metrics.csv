@@ -1,0 +1,2 @@
+Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
+Chameleon,-0.1988,0.1547,0.0508,10.06,5.052,7.9394,0.7892

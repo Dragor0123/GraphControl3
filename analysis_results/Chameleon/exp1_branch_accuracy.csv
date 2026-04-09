@@ -1,0 +1,2 @@
+Dataset,Homophily_Ratio,Frozen_Acc,Control_Acc,Combined_Acc,Frozen_Acc_Std,Control_Acc_Std,Combined_Acc_Std
+Chameleon,0.2305,0.2202,0.4246,0.4456,0.0314,0.0393,0.0182

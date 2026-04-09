@@ -1,0 +1,2 @@
+Dataset,Homophily_Ratio,Frozen_Acc,Control_Acc,Combined_Acc,Frozen_Acc_Std,Control_Acc_Std,Combined_Acc_Std
+DBLP,0.8279,0.4108,0.8091,0.8094,0.0814,0.0044,0.0058

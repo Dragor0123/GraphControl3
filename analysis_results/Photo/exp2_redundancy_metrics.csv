@@ -1,0 +1,2 @@
+Dataset,Cosine_Mean,Cosine_Std,CKA,ERank_Frozen,ERank_Control,ERank_Concat,ERank_Ratio
+Photo,-0.1503,0.2896,0.0375,10.0422,5.9692,7.563,0.7532

@@ -1,0 +1,7 @@
+Dataset,RQ_Frozen_Mean,RQ_Frozen_Std,RQ_Control_Mean,RQ_Control_Std,RQ_Diff
+Squirrel_seed0,0.415,0.1567,0.4532,0.1294,-0.0381
+Squirrel_seed1,0.413,0.1582,0.4146,0.1958,-0.0016
+Squirrel_seed2,0.4136,0.1577,0.6402,0.1488,-0.2265
+Squirrel_seed3,0.4162,0.1571,0.5208,0.171,-0.1047
+Squirrel_seed4,0.4113,0.16,0.5953,0.1264,-0.184
+Squirrel,0.4138,0.158,0.5248,0.1778,-0.111

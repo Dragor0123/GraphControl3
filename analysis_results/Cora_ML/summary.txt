@@ -4,12 +4,12 @@ GraphControl Branch Complementarity Analysis — Cora_ML
 Experiment 1: Per-Branch Classification Performance
 (Aggregated over all seeds)
 Dataset  Homophily_Ratio  Frozen_Acc  Control_Acc  Combined_Acc  Frozen_Acc_Std  Control_Acc_Std  Combined_Acc_Std
-Cora_ML           0.7886      0.2834       0.1476        0.1476             NaN              NaN               NaN
+Cora_ML           0.7886      0.1891       0.7937        0.8023          0.0677           0.0129            0.0051
 
 Experiment 2: Representation Redundancy Metrics
 (Aggregated over all seeds)
 Dataset  Cosine_Mean  Cosine_Std    CKA  ERank_Frozen  ERank_Control  ERank_Concat  ERank_Ratio
-Cora_ML       0.7168      0.0561 0.2877        10.333          4.068         10.96       1.0607
+Cora_ML      -0.1043      0.2154 0.0152       10.4072         6.0418        7.7118       0.7409
 
 Interpretation guide:
   CKA → 1.0       : branches are representationally similar (redundant)
