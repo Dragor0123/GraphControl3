@@ -1,0 +1,3 @@
+Dataset,RQ_Frozen_Mean,RQ_Frozen_Std,RQ_Control_Mean,RQ_Control_Std,RQ_Diff
+Cora_ML_seed0,0.2015,0.1443,0.45,0.1674,-0.2485
+Cora_ML,0.2015,0.1443,0.45,0.1674,-0.2485
