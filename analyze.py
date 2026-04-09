@@ -35,14 +35,7 @@ from optimizers import create_optimizer
 # Output directories
 # ─────────────────────────────────────────────────────────────────────────────
 
-OUT_DIR = 'analysis_results'
-for d in [
-    OUT_DIR,
-    f'{OUT_DIR}/exp2_cosine_histograms',
-    f'{OUT_DIR}/exp3_homophily_contribution',
-    f'{OUT_DIR}/exp4_spectral_analysis',
-]:
-    os.makedirs(d, exist_ok=True)
+OUT_DIR = 'analysis_results'   # overridden in main() to analysis_results/{dataset}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -460,25 +453,35 @@ def run_experiment_2(records, dataset_name, redundancy_list):
 # Experiment 3: Local Homophily vs. Branch Contribution
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_experiment_3(records, tag_name):
+def _assign_quartiles_value(lh_vals: np.ndarray) -> np.ndarray:
     """
-    tag_name: used for filenames (e.g. 'Cora_ML' or 'Cora_ML_seed0').
+    값 기반 분류: q25/q50/q75 경계값으로 분류.
+    동일 homophily 값이 많은 편향 분포에서 특정 분위가 비어버릴 수 있음.
     """
-    if not records:
-        return
+    q25, q50, q75 = np.quantile(lh_vals, [0.25, 0.50, 0.75])
+    labels = np.where(lh_vals >= q75, 'Q1',
+             np.where(lh_vals >= q50, 'Q2',
+             np.where(lh_vals >= q25, 'Q3', 'Q4')))
+    return labels
 
-    lh_vals = np.array([r['local_homophily'] for r in records])
+
+def _assign_quartiles_rank(lh_vals: np.ndarray) -> np.ndarray:
+    """
+    순위 기반 분류: 정렬 순위를 기준으로 분류.
+    항상 4개 분위가 균등하게 채워지지만 경계 근처 동일 값이 다른 분위로 분리될 수 있음.
+    """
     n = len(lh_vals)
-    # Rank-based quartile assignment: guarantees all 4 buckets are populated
-    # even when many nodes share the same homophily value (e.g. highly homophilic datasets).
     ranks = np.argsort(np.argsort(lh_vals, kind='stable'), kind='stable')
-    quartile_labels = np.where(ranks >= int(0.75 * n), 'Q1',
-                      np.where(ranks >= int(0.50 * n), 'Q2',
-                      np.where(ranks >= int(0.25 * n), 'Q3', 'Q4')))
+    labels = np.where(ranks >= int(0.75 * n), 'Q1',
+             np.where(ranks >= int(0.50 * n), 'Q2',
+             np.where(ranks >= int(0.25 * n), 'Q3', 'Q4')))
+    return labels
 
+
+def _compute_quartile_stats(records, quartile_labels):
+    """분위 레이블 배열로 통계 계산 → table_rows 반환."""
     buckets = {q: [] for q in ['Q1', 'Q2', 'Q3', 'Q4']}
     for r, q in zip(records, quartile_labels):
-        q = str(q)
         hf = r['h_frozen']
         hc = r['h_control']
         hb = r['h_combined']
@@ -487,10 +490,10 @@ def run_experiment_3(records, tag_name):
         norm_ratio = norm_c / (norm_f + norm_c + 1e-10)
         cos_f = F.cosine_similarity(hf.unsqueeze(0), hb.unsqueeze(0)).item()
         cos_c = F.cosine_similarity(hc.unsqueeze(0), hb.unsqueeze(0)).item()
-        buckets[q].append({
-            'norm_ratio':             norm_ratio,
-            'cos_frozen_combined':    cos_f,
-            'cos_control_combined':   cos_c,
+        buckets[str(q)].append({
+            'norm_ratio':           norm_ratio,
+            'cos_frozen_combined':  cos_f,
+            'cos_control_combined': cos_c,
             'correct_frozen':   int(r['pred_frozen']   == r['y_true']),
             'correct_control':  int(r['pred_control']  == r['y_true']),
             'correct_combined': int(r['pred_combined'] == r['y_true']),
@@ -511,21 +514,24 @@ def run_experiment_3(records, tag_name):
             'Acc_Control':     round(np.mean([d['correct_control']      for d in bd]), 4),
             'Acc_Combined':    round(np.mean([d['correct_combined']     for d in bd]), 4),
         })
+    return table_rows
 
+
+def _save_quartile_results(table_rows, tag_name, suffix, mode_label):
+    """통계 테이블을 CSV + 플롯으로 저장."""
     df = pd.DataFrame(table_rows)
-    print(f'\n[Exp 3] {tag_name}')
+    print(f'\n[Exp 3 | {mode_label}] {tag_name}')
     print(df.to_string(index=False))
 
-    out_base = f'{OUT_DIR}/exp3_homophily_contribution/{tag_name}'
+    out_base = f'{OUT_DIR}/exp3_homophily_contribution/{tag_name}_{suffix}'
     df.to_csv(f'{out_base}_table.csv', index=False)
 
-    # Plots
     qs    = [r['Quartile'] for r in table_rows]
     x_pos = np.arange(len(qs))
     width = 0.25
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle(f'{tag_name} — Branch Contribution by Local Homophily Quartile\n'
+    fig.suptitle(f'{tag_name} [{mode_label}] — Branch Contribution by Local Homophily Quartile\n'
                  f'(Q1 = highest homophily, Q4 = lowest)')
 
     axes[0].bar(x_pos, [r['NormRatio_Mean'] for r in table_rows],
@@ -552,6 +558,30 @@ def run_experiment_3(records, tag_name):
     plt.tight_layout()
     fig.savefig(f'{out_base}_plot.png', dpi=150)
     plt.close(fig)
+
+
+def run_experiment_3(records, tag_name, mode='both'):
+    """
+    mode 옵션:
+      'value' — 값 기반 분류 (q25/q50/q75 경계값)
+      'rank'  — 순위 기반 분류 (항상 균등 분위)
+      'both'  — 두 방식 모두 수행하여 각각 저장 (default)
+    tag_name: 파일명 prefix (e.g. 'Cora_ML' or 'Cora_ML_seed0').
+    """
+    if not records:
+        return
+
+    lh_vals = np.array([r['local_homophily'] for r in records])
+
+    if mode in ('value', 'both'):
+        labels = _assign_quartiles_value(lh_vals)
+        rows   = _compute_quartile_stats(records, labels)
+        _save_quartile_results(rows, tag_name, suffix='value', mode_label='Value-based')
+
+    if mode in ('rank', 'both'):
+        labels = _assign_quartiles_rank(lh_vals)
+        rows   = _compute_quartile_stats(records, labels)
+        _save_quartile_results(rows, tag_name, suffix='rank', mode_label='Rank-based')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -675,9 +705,20 @@ def write_summary(dataset_name, df1, df2):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main(config):
+    global OUT_DIR
+    OUT_DIR = f'analysis_results/{config.dataset}'
+    for d in [
+        OUT_DIR,
+        f'{OUT_DIR}/exp2_cosine_histograms',
+        f'{OUT_DIR}/exp3_homophily_contribution',
+        f'{OUT_DIR}/exp4_spectral_analysis',
+    ]:
+        os.makedirs(d, exist_ok=True)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}')
     print(f'Dataset: {config.dataset}  Seeds: {config.seeds}')
+    print(f'Output dir: {OUT_DIR}')
 
     # ── Dataset loading ───────────────────────────────────────────────────────
     dataset_obj = NodeDataset(config.dataset, n_seeds=config.seeds)
@@ -744,7 +785,7 @@ def main(config):
 
         run_experiment_1(records, config.dataset, homophily_ratio, exp1_rows)
         run_experiment_2(records, config.dataset, exp2_rows)
-        run_experiment_3(records, f'{config.dataset}_seed{seed}')
+        run_experiment_3(records, f'{config.dataset}_seed{seed}', mode=config.quartile_mode)
         run_experiment_4(records, f'{config.dataset}_seed{seed}', exp4_rows)
 
     # ── Aggregate across seeds ─────────────────────────────────────────────────
@@ -771,7 +812,7 @@ def main(config):
 
     # Exp 3 — combined over all seeds
     print('\n[Exp 3 COMBINED (all seeds)]')
-    run_experiment_3(all_records, config.dataset)
+    run_experiment_3(all_records, config.dataset, mode=config.quartile_mode)
 
     # Exp 4 — combined over all seeds
     print('\n[Exp 4 COMBINED (all seeds)]')
@@ -789,6 +830,22 @@ def main(config):
     print(f'\nAll results saved to {OUT_DIR}/')
 
 
+class AnalysisArguments(Arguments):
+    """Arguments 를 상속하여 analyze.py 전용 인자를 추가."""
+    def __init__(self):
+        super().__init__()
+        self.parser.add_argument(
+            '--quartile_mode', type=str, default='both',
+            choices=['value', 'rank', 'both'],
+            help=(
+                'Exp 3 quartile assignment strategy. '
+                '"value": q25/q50/q75 경계값 기반 (편향 분포에서 빈 분위 가능), '
+                '"rank": 순위 기반 (항상 균등 분위), '
+                '"both": 두 방식 모두 수행 (default).'
+            )
+        )
+
+
 if __name__ == '__main__':
-    config = Arguments().parse_args()
+    config = AnalysisArguments().parse_args()
     main(config)
