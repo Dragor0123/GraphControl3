@@ -24,6 +24,7 @@ from tqdm import tqdm
 
 from utils.random import reset_random_seed
 from utils.args import Arguments
+from utils.metrics import compute_margin_gain, compute_true_class_margin
 from utils.sampling import collect_subgraphs
 from utils.transforms import process_attributes, obtain_attributes
 from models import load_model
@@ -139,17 +140,20 @@ class GraphControlAnalyzer:
         but exposes all intermediate tensors.
         """
         with torch.no_grad():
-            m = self.model
-            m.encoder.eval()
+            diagnostics = self.model.forward_with_diagnostics(
+                x, x_sim, edge_index, batch, root_n_id, frozen=True)
 
-            h_frozen = m.encoder.forward_subgraph(x, edge_index, batch, root_n_id)
+        return (
+            diagnostics['h_f'],
+            diagnostics['h_tc_raw'],
+            diagnostics['h_c'],
+            diagnostics['h_fc'],
+        )
 
-            x_down   = m.zero_conv1(x_sim) + x
-            h_tc_raw = m.trainable_copy.forward_subgraph(x_down, edge_index, batch, root_n_id)
-            h_control  = m.zero_conv2(h_tc_raw)
-            h_combined = h_frozen + h_control
-
-        return h_frozen, h_tc_raw, h_control, h_combined
+    def extract_graph_diagnostics(self, x, x_sim, edge_index, batch, root_n_id):
+        with torch.no_grad():
+            return self.model.forward_with_diagnostics(
+                x, x_sim, edge_index, batch, root_n_id, frozen=True)
 
     def extract_node_level_representations(self, x, x_sim, edge_index, batch, root_n_id):
         """
@@ -272,9 +276,14 @@ def finetune(config, model, train_loader, device, full_x_sim, test_loader):
             x = data.x * sign_flip.unsqueeze(0)
 
             x_sim = full_x_sim[data.original_idx]
-            preds = model.forward_subgraph(x, x_sim, data.edge_index, data.batch,
-                                           data.root_n_id, frozen=True)
-            loss = criterion(preds, data.y)
+            diagnostics = model.forward_with_diagnostics(
+                x, x_sim, data.edge_index, data.batch, data.root_n_id, frozen=True)
+            ce_loss = criterion(diagnostics['z_fc'], data.y)
+            loss = ce_loss
+            if config.use_l_gain:
+                # Reserved insertion point for future margin-gain objective.
+                loss = loss + config.lambda_gain * torch.zeros(
+                    (), device=ce_loss.device, dtype=ce_loss.dtype)
             loss.backward()
             optimizer.step()
 
@@ -320,9 +329,11 @@ def collect_all_test_data(analyzer, analysis_loader, full_x_sim, device,
         b     = data.batch
         rnid  = data.root_n_id
 
-        # Graph-level representations
-        h_frozen, h_tc_raw, h_control, h_combined = \
-            analyzer.extract_graph_representations(x, x_sim, ei, b, rnid)
+        diagnostics = analyzer.extract_graph_diagnostics(x, x_sim, ei, b, rnid)
+        h_frozen = diagnostics['h_f']
+        h_tc_raw = diagnostics['h_tc_raw']
+        h_control = diagnostics['h_c']
+        h_combined = diagnostics['h_fc']
 
         # Node-level representations (for Exp 4)
         try:
@@ -331,12 +342,15 @@ def collect_all_test_data(analyzer, analysis_loader, full_x_sim, device,
         except Exception as e:
             h_fn = h_cn = None
 
-        # Classification logits using the shared linear_classifier
-        with torch.no_grad():
-            clf = analyzer.model.linear_classifier
-            logits_frozen   = clf(h_frozen)
-            logits_control  = clf(h_control)
-            logits_combined = clf(h_combined)
+        logits_frozen = diagnostics['z_f']
+        logits_control = diagnostics['z_c']
+        logits_combined = diagnostics['z_fc']
+
+        labels = data.y.view(-1)
+        margin_f = compute_true_class_margin(logits_frozen, labels).item()
+        margin_fc = compute_true_class_margin(logits_combined, labels).item()
+        margin_gain = compute_margin_gain(
+            logits_frozen, logits_combined, labels).item()
 
         y_true        = data.y.item()
         pred_frozen   = logits_frozen.argmax(dim=1).item()
@@ -355,6 +369,9 @@ def collect_all_test_data(analyzer, analysis_loader, full_x_sim, device,
             'pred_frozen':     pred_frozen,
             'pred_control':    pred_control,
             'pred_combined':   pred_combined,
+            'margin_f':        margin_f,
+            'margin_fc':       margin_fc,
+            'margin_gain':     margin_gain,
             'h_frozen':        h_frozen.squeeze(0).cpu(),   # (D,)
             'h_control':       h_control.squeeze(0).cpu(),  # (D,)
             'h_combined':      h_combined.squeeze(0).cpu(), # (D,)
@@ -368,6 +385,49 @@ def collect_all_test_data(analyzer, analysis_loader, full_x_sim, device,
         })
 
     return records
+
+
+def export_margin_metrics(records, dataset_name, seed, summary_rows):
+    if not records:
+        return
+
+    raw_dir = f'{OUT_DIR}/margin_raw'
+    os.makedirs(raw_dir, exist_ok=True)
+
+    raw_rows = []
+    for r in records:
+        raw_rows.append({
+            'dataset': dataset_name,
+            'seed': seed,
+            'split': 'test',
+            'sample_index': r['center_global'],
+            'node_id': r['center_global'],
+            'label': r['y_true'],
+            'pred_frozen': r['pred_frozen'],
+            'pred_combined': r['pred_combined'],
+            'margin_f': r['margin_f'],
+            'margin_fc': r['margin_fc'],
+            'margin_gain': r['margin_gain'],
+        })
+
+    raw_df = pd.DataFrame(raw_rows)
+    raw_df.to_csv(
+        f'{raw_dir}/margin_metrics_{dataset_name}_seed{seed}.csv',
+        index=False,
+    )
+
+    summary_rows.append({
+        'dataset': dataset_name,
+        'seed': seed,
+        'split': 'test',
+        'num_samples': len(raw_df),
+        'mean_margin_f': raw_df['margin_f'].mean(),
+        'mean_margin_fc': raw_df['margin_fc'].mean(),
+        'mean_margin_gain': raw_df['margin_gain'].mean(),
+        'std_margin_gain': raw_df['margin_gain'].std(ddof=0),
+        'positive_margin_gain_frac': (raw_df['margin_gain'] > 0).mean(),
+        'negative_margin_gain_frac': (raw_df['margin_gain'] < 0).mean(),
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -671,7 +731,7 @@ def run_experiment_4(records, tag_name, rq_agg_list):
 # Summary writer
 # ─────────────────────────────────────────────────────────────────────────────
 
-def write_summary(dataset_name, df1, df2):
+def write_summary(dataset_name, df1, df2, df_margin):
     lines = [
         f'GraphControl Branch Complementarity Analysis — {dataset_name}',
         '=' * 60,
@@ -683,6 +743,10 @@ def write_summary(dataset_name, df1, df2):
         'Experiment 2: Representation Redundancy Metrics',
         '(Aggregated over all seeds)',
         df2.to_string(index=False),
+        '',
+        'Margin diagnostics',
+        '(Aggregated over all seeds)',
+        df_margin.to_string(index=False),
         '',
         'Interpretation guide:',
         '  CKA → 1.0       : branches are representationally similar (redundant)',
@@ -712,6 +776,8 @@ def main(config):
         f'{OUT_DIR}/exp2_cosine_histograms',
         f'{OUT_DIR}/exp3_homophily_contribution',
         f'{OUT_DIR}/exp4_spectral_analysis',
+        f'{OUT_DIR}/margin_raw',
+        f'{OUT_DIR}/margin_summary',
     ]:
         os.makedirs(d, exist_ok=True)
 
@@ -749,6 +815,7 @@ def main(config):
     exp1_rows         = []   # one row per seed
     exp2_rows         = []   # one row per seed
     exp4_rows         = []   # one row per seed
+    margin_rows       = []   # one row per seed
     all_records       = []   # all records from all seeds (for combined Exp 3/4)
 
     # ── Per-seed loop ─────────────────────────────────────────────────────────
@@ -782,6 +849,7 @@ def main(config):
         records = collect_all_test_data(
             analyzer, analysis_loader, x_sim, device, local_hom)
         all_records.extend(records)
+        export_margin_metrics(records, config.dataset, seed, margin_rows)
 
         run_experiment_1(records, config.dataset, homophily_ratio, exp1_rows)
         run_experiment_2(records, config.dataset, exp2_rows)
@@ -810,6 +878,25 @@ def main(config):
     print(f'\n[Exp 2 AGGREGATE]\n{agg2.to_string(index=False)}')
     agg2.to_csv(f'{OUT_DIR}/exp2_redundancy_metrics.csv', index=False)
 
+    df_margin = pd.DataFrame(margin_rows)
+    margin_num_cols = [
+        'num_samples',
+        'mean_margin_f',
+        'mean_margin_fc',
+        'mean_margin_gain',
+        'std_margin_gain',
+        'positive_margin_gain_frac',
+        'negative_margin_gain_frac',
+    ]
+    agg_margin = df_margin.groupby('dataset').agg(
+        **{col: (col, 'mean') for col in margin_num_cols},
+    ).reset_index().round(4)
+    print(f'\n[Margin AGGREGATE]\n{agg_margin.to_string(index=False)}')
+    agg_margin.to_csv(
+        f'{OUT_DIR}/margin_summary/margin_summary_{config.dataset}.csv',
+        index=False,
+    )
+
     # Exp 3 — combined over all seeds
     print('\n[Exp 3 COMBINED (all seeds)]')
     run_experiment_3(all_records, config.dataset, mode=config.quartile_mode)
@@ -826,7 +913,7 @@ def main(config):
             index=False)
 
     # Summary text
-    write_summary(config.dataset, agg1, agg2)
+    write_summary(config.dataset, agg1, agg2, agg_margin)
     print(f'\nAll results saved to {OUT_DIR}/')
 
 

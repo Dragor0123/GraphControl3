@@ -13,8 +13,12 @@ This document defines the implementation task for extending the original GraphCo
    - sample-wise margin gain,
    - infrastructure for future `L_gain` insertion.
 
-This document is written for a Codex-style coding agent. The priority is **clean implementation, minimal disruption to the original code, and reproducible experimentation**.
 
+The purpose of introducing the margin gain objective is to address a fundamental limitation of the current GraphControl architecture. Empirical analysis shows that the trainable control branch dominates prediction, while the frozen branch contributes negligibly, indicating that the model does not function as a true residual system.
+
+To correct this, we aim to encourage the trainable branch to improve predictions relative to the frozen branch, rather than independently solving the entire task. The margin gain formulation explicitly measures how much the combined model improves over the frozen baseline at the sample level, and is designed to guide the trainable branch toward learning complementary, residual information instead of duplicating or overriding the frozen representation.
+
+Note: The priority is **clean implementation, minimal disruption to the original code, and reproducible experimentation**.
 ---
 
 ## Current Research Status
