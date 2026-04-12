@@ -26,9 +26,9 @@ class Arguments:
         self.parser.add_argument('--batch_size', type=int, default=128)
         self.parser.add_argument('--finetune', action='store_true', help="Quickly find optim parameters")
         self.parser.add_argument('--use_l_gain', action='store_true',
-                                 help="reserved flag for future margin-gain loss insertion")
+                                 help="add margin-gain loss during training")
         self.parser.add_argument('--lambda_gain', type=float, default=0.0,
-                                 help="reserved coefficient for future margin-gain loss")
+                                 help="coefficient for margin-gain loss")
         
         # Processing node attributes
         self.parser.add_argument('--use_adj', action='store_true', help="use eigen-vectors of adjacent matrix as node attributes")

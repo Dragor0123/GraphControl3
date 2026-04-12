@@ -24,3 +24,12 @@ def compute_margin_gain(
     margin_f = compute_true_class_margin(frozen_logits, labels)
     margin_fc = compute_true_class_margin(combined_logits, labels)
     return margin_fc - margin_f
+
+
+def compute_margin_gain_loss(
+    frozen_logits: torch.Tensor,
+    combined_logits: torch.Tensor,
+    labels: torch.Tensor,
+) -> torch.Tensor:
+    margin_gain = compute_margin_gain(frozen_logits, combined_logits, labels)
+    return torch.relu(-margin_gain).mean()

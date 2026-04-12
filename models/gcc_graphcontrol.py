@@ -69,7 +69,7 @@ class GCC_GraphControl(nn.Module):
         h_c = self.zero_conv2(h_tc_raw)
         h_fc = h_f + h_c
 
-        z_f = self.linear_classifier(h_f)
+        z_f = self.linear_classifier(h_f).detach()
         z_c = self.linear_classifier(h_c)
         z_fc = self.linear_classifier(h_fc)
 

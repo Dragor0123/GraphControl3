@@ -1,0 +1,9 @@
+dataset,acc_Mean,std_dev
+Cora_ML,0.8016,0.0100
+DBLP,0.8073,0.0033
+Photo,0.8874,0.0084
+Chameleon,0.4408,0.0202
+Squirrel,0.2870,0.0070
+Actor,0.2657,0.0028
+
+// learning rate = 0.5, adamw optimizer used , feature similarity threshold = 0.17 (but, 0.15 used for Squirrel because of runtime error), epochs = 200 5 seeds used

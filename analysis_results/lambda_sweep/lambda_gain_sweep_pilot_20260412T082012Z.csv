@@ -1,0 +1,2 @@
+dataset,lambda_gain,acc_mean,acc_std,baseline_mean,baseline_std,baseline_floor,acc_delta,meets_baseline,epochs,seeds
+Cora_ML,0.02,0.7965,0.0100,0.8016,0.0100,0.7916,-0.0051,1,200,"0 1 2 3 4"
