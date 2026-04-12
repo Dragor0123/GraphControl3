@@ -1,0 +1,7 @@
+GraphControl Margin Analysis — DBLP
+============================================================
+
+Margin diagnostics
+(Aggregated over all seeds)
+dataset  num_samples  mean_margin_f  mean_margin_fc  mean_margin_gain  std_margin_gain  positive_margin_gain_frac  negative_margin_gain_frac
+   DBLP      15945.0        -0.6478          3.1126            3.7604           3.6364                     0.8478                     0.1522

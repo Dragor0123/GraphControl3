@@ -1,0 +1,7 @@
+dataset,num_samples,mean_margin_f,mean_margin_fc,mean_margin_gain,std_margin_gain,positive_margin_gain_frac,negative_margin_gain_frac
+Cora_ML,2696.0,-2.2324,4.9396,7.1721,7.7147,0.8595,0.1405
+DBLP,15945.0,-0.6478,3.1126,3.7604,3.6364,0.8478,0.1522
+Photo,6885.0,-3.143,9.321,12.464,9.8196,0.9174,0.0826
+Chameleon,456.0,-0.6045,0.0591,0.6637,3.7969,0.5013,0.4987
+Squirrel,1041.0,-0.2489,-0.3939,-0.1449,0.7008,0.444,0.556
+Actor,1520.0,-0.3133,-0.4601,-0.1468,0.7271,0.358,0.642

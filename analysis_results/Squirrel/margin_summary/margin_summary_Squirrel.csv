@@ -1,0 +1,2 @@
+dataset,num_samples,mean_margin_f,mean_margin_fc,mean_margin_gain,std_margin_gain,positive_margin_gain_frac,negative_margin_gain_frac
+Squirrel,1041.0,-0.2489,-0.3939,-0.1449,0.7008,0.444,0.556

@@ -1,0 +1,2 @@
+dataset,num_samples,mean_margin_f,mean_margin_fc,mean_margin_gain,std_margin_gain,positive_margin_gain_frac,negative_margin_gain_frac
+Chameleon,456.0,-0.6045,0.0591,0.6637,3.7969,0.5013,0.4987

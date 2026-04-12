@@ -1,0 +1,7 @@
+GraphControl Margin Analysis — Photo
+============================================================
+
+Margin diagnostics
+(Aggregated over all seeds)
+dataset  num_samples  mean_margin_f  mean_margin_fc  mean_margin_gain  std_margin_gain  positive_margin_gain_frac  negative_margin_gain_frac
+  Photo       6885.0         -3.143           9.321            12.464           9.8196                     0.9174                     0.0826
