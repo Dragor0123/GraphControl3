@@ -43,6 +43,16 @@ class Arguments:
         self.parser.add_argument('--walk_length', type=int, default=50, help="Walk length for node2vec")
         self.parser.add_argument('--context_size', type=int, default=10, help="Context size for node2vec")
         self.parser.add_argument('--walk_per_nodes', type=int, default=10, help="Walk per nodes for node2vec")
+
+        # Dual-track experiment: Condition Redesign + Operator Probe
+        self.parser.add_argument('--condition_mode', type=str, default='similarity',
+                                 choices=['similarity', 'dissimilarity'],
+                                 help="Condition topology: similarity (original A') or dissimilarity (heterophilic A')")
+        self.parser.add_argument('--dissim_threshold', type=float, default=0.5,
+                                 help="Cosine similarity threshold for dissimilarity condition (edge kept if K < threshold)")
+        self.parser.add_argument('--operator_mode', type=str, default='standard',
+                                 choices=['standard', 'anti_smoothing'],
+                                 help="GIN aggregation: standard (sum, low-pass) or anti_smoothing (subtract, high-pass)")
         
     def parse_args(self):
         return self.parser.parse_args()

@@ -7,7 +7,7 @@ from torch_geometric.nn import GINConv
 from torch_geometric.nn import global_mean_pool, global_add_pool, global_max_pool
 from utils.register import register
 import copy
-from .gcc import GCC
+from .gcc import GCC, AntiSmoothingGINConv
 
 @register.model_register
 class GCC_GraphControl(nn.Module):
@@ -17,12 +17,16 @@ class GCC_GraphControl(nn.Module):
         **kwargs
     ):
         super(GCC_GraphControl, self).__init__()
+        operator_mode = kwargs.pop('operator_mode', 'standard')
         input_dim = kwargs['positional_embedding_size']
         hidden_size = kwargs['node_hidden_dim']
         output_dim = kwargs['num_classes']
-        
+
         self.encoder = GCC(**kwargs)
         self.trainable_copy = copy.deepcopy(self.encoder)
+
+        if operator_mode == 'anti_smoothing':
+            self._apply_anti_smoothing(self.trainable_copy)
         
         self.zero_conv1 = torch.nn.Linear(input_dim, input_dim)     
         self.zero_conv2 = torch.nn.Linear(hidden_size, hidden_size)
@@ -40,6 +44,13 @@ class GCC_GraphControl(nn.Module):
     def forward(self, x, edge_index, edge_weight=None, frozen=False, **kwargs):
         raise NotImplementedError('Please use --subsampling')
     
+    @staticmethod
+    def _apply_anti_smoothing(gcc_model):
+        """Replace all GINConv layers in UnsupervisedGIN with AntiSmoothingGINConv.
+        The MLP weights are preserved; only the aggregation sign is flipped."""
+        for i in range(len(gcc_model.gnn.ginlayers)):
+            gcc_model.gnn.ginlayers[i].__class__ = AntiSmoothingGINConv
+
     def reset_classifier(self):
         self.linear_classifier.reset_parameters()
 

@@ -1,4 +1,6 @@
 import copy
+import json
+import os
 import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
@@ -9,7 +11,12 @@ from utils.random import reset_random_seed
 from utils.args import Arguments
 from utils.metrics import compute_margin_gain, compute_margin_gain_loss
 from utils.sampling import collect_subgraphs
-from utils.transforms import process_attributes, obtain_attributes
+from utils.transforms import (
+    process_attributes,
+    obtain_attributes,
+    obtain_attributes_dissimilarity,
+    compute_condition_homophily,
+)
 from models import load_model
 from datasets import NodeDataset
 from optimizers import create_optimizer
@@ -137,18 +144,125 @@ def finetune(config, model, train_loader, device, full_x_sim, test_loader):
     }
 
 
+def _get_config_name(config):
+    """Derive experiment subdirectory name from condition_mode and operator_mode."""
+    c = getattr(config, 'condition_mode', 'similarity')
+    o = getattr(config, 'operator_mode', 'standard')
+    if c == 'similarity' and o == 'standard':
+        return 'baseline'
+    elif c == 'dissimilarity' and o == 'standard':
+        thr = getattr(config, 'dissim_threshold', 0.5)
+        return f'C1_dissim/threshold_{thr}'
+    elif c == 'similarity' and o == 'anti_smoothing':
+        return 'O1_antismooth'
+    else:
+        thr = getattr(config, 'dissim_threshold', 0.5)
+        return f'C1_O1_combined/threshold_{thr}'
+
+
+def _save_results(config, seed_metrics, condition_stats):
+    config_name = _get_config_name(config)
+    out_dir = os.path.join('experiment_results', 'dual_track', config_name)
+    os.makedirs(out_dir, exist_ok=True)
+
+    result = {
+        'config': {
+            'dataset': config.dataset,
+            'seeds': config.seeds,
+            'condition_mode': getattr(config, 'condition_mode', 'similarity'),
+            'dissim_threshold': getattr(config, 'dissim_threshold', 0.5),
+            'operator_mode': getattr(config, 'operator_mode', 'standard'),
+            'epochs': config.epochs,
+            'lr': config.lr,
+            'threshold': config.threshold,
+        },
+        'condition_stats': condition_stats,
+        'seed_metrics': seed_metrics,
+        'summary': {
+            'combined_acc_mean': float(np.mean([m['combined_acc'] for m in seed_metrics])),
+            'combined_acc_std': float(np.std([m['combined_acc'] for m in seed_metrics])),
+            'frozen_acc_mean': float(np.mean([m['frozen_acc'] for m in seed_metrics])),
+            'control_acc_mean': float(np.mean([m['control_acc'] for m in seed_metrics])),
+        },
+    }
+
+    fname = os.path.join(out_dir, f'{config.dataset}.json')
+    with open(fname, 'w') as f:
+        json.dump(result, f, indent=2)
+    print(f"Results saved to {fname}")
+
+
 def main(config):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') 
-    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     dataset_obj = NodeDataset(config.dataset, n_seeds=config.seeds)
     dataset_obj.print_statistics()
-    
-    # For large graph, we use cpu to preprocess it rather than gpu because of OOM problem.
+
+    condition_mode = getattr(config, 'condition_mode', 'similarity')
+    dissim_threshold = getattr(config, 'dissim_threshold', 0.5)
+
+    # For large graph, use cpu to preprocess rather than gpu (OOM prevention).
     if dataset_obj.num_nodes < 30000:
         dataset_obj.to(device)
-    x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold).to(device)
-    
-    dataset_obj.to('cpu') # Otherwise the deepcopy will raise an error
+
+    condition_stats = {}
+    if condition_mode == 'dissimilarity':
+        x_sim, cstats = obtain_attributes_dissimilarity(
+            dataset_obj.data, num_dim=config.num_dim, dissim_threshold=dissim_threshold
+        )
+        x_sim = x_sim.to(device)
+        # Compute homophily ratio of A'_dissim if labels are available
+        if hasattr(dataset_obj.data, 'y') and not cstats.get('fallback', False):
+            from torch_geometric.utils import to_undirected, remove_self_loops, to_dense_adj
+            import torch as _torch
+            from utils.normalize import similarity as _sim
+            X = dataset_obj.data.x
+            N = X.size(0)
+            K = _sim(X, X)
+            edges = to_undirected(dataset_obj.data.edge_index)
+            edges, _ = remove_self_loops(edges)
+            A_orig = to_dense_adj(edges, max_num_nodes=N)[0]
+            A_dissim = ((_torch.lt(K, dissim_threshold)).float()) * A_orig
+            A_dissim.fill_diagonal_(0)
+            A_dissim = (A_dissim + A_dissim.T).clamp(max=1.0)
+            hom = compute_condition_homophily(dataset_obj.data, A_dissim)
+            cstats['homophily_ratio'] = hom
+        condition_stats = cstats
+        print(
+            f"[Condition] dissimilarity A': edges={cstats['num_edges']}, "
+            f"overlap_ratio={cstats['overlap_ratio']:.4f}, "
+            f"homophily_ratio={cstats.get('homophily_ratio', 'N/A')}"
+        )
+    else:
+        x_sim = obtain_attributes(dataset_obj.data, use_adj=False, threshold=config.threshold).to(device)
+        # Compute stats for similarity A' as well
+        from torch_geometric.utils import to_undirected, remove_self_loops, to_dense_adj
+        from utils.normalize import similarity as _sim
+        X = dataset_obj.data.x
+        N = X.size(0)
+        K = _sim(X, X)
+        edges_orig = to_undirected(dataset_obj.data.edge_index)
+        edges_orig, _ = remove_self_loops(edges_orig)
+        A_orig = to_dense_adj(edges_orig, max_num_nodes=N)[0]
+        A_sim = torch.where(K > config.threshold, 1.0, 0.0)
+        A_sim.fill_diagonal_(0)
+        num_edges_sim = int(A_sim.sum().item()) // 2
+        num_edges_orig = int(A_orig.sum().item()) // 2
+        hom = compute_condition_homophily(dataset_obj.data, A_sim)
+        condition_stats = {
+            'num_edges': num_edges_sim,
+            'num_edges_orig': num_edges_orig,
+            'overlap_ratio': (A_sim * A_orig).sum().item() / max(A_sim.sum().item(), 1),
+            'homophily_ratio': hom,
+            'threshold': config.threshold,
+        }
+        print(
+            f"[Condition] similarity A': edges={num_edges_sim}, "
+            f"overlap_ratio={condition_stats['overlap_ratio']:.4f}, "
+            f"homophily_ratio={hom}"
+        )
+
+    dataset_obj.to('cpu')  # Otherwise the deepcopy will raise an error
     num_node_features = config.num_dim
 
     train_masks = dataset_obj.data.train_mask
@@ -164,9 +278,9 @@ def main(config):
         elif dataset_obj.data.train_mask.dim() > 1:
             dataset_obj.data.train_mask = train_masks[:, seed]
             dataset_obj.data.test_mask = test_masks[:, seed]
-        
+
         train_loader, test_loader = preprocess(config, dataset_obj, device)
-        
+
         model = load_model(num_node_features, dataset_obj.num_classes, config)
         model = model.to(device)
 
@@ -227,6 +341,8 @@ def main(config):
             f"{np.mean(train_l_gain_values):.4f}"
             f"±{np.std(train_l_gain_values):.4f}"
         )
+
+    _save_results(config, seed_metrics, condition_stats)
 
 
 def eval_subgraph(config, model, test_loader, device, full_x_sim):

@@ -23,7 +23,8 @@ def load_model(input_dim: int, output_dim: int, config):
             gnn_model=opt.model,
             norm=opt.norm,
             degree_input=True,
-            num_classes = output_dim
+            num_classes=output_dim,
+            operator_mode=getattr(config, 'operator_mode', 'standard'),
         )
         params = state_dict['model']
         change_params_key(params)

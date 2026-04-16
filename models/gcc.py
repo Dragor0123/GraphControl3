@@ -9,6 +9,23 @@ import torch_geometric
 from utils.register import register
 
 
+class AntiSmoothingGINConv(GINConv):
+    """
+    GINConv variant that subtracts neighbor aggregation instead of adding it.
+    h_v = MLP((1+eps)*h_v - sum_{u in N(v)} h_u)
+    This is a high-pass filter that amplifies heterophilic signals.
+    Only the forward pass changes; all MLP weights are inherited from GINConv.
+    """
+    def forward(self, x, edge_index, size=None):
+        if isinstance(x, torch.Tensor):
+            x = (x, x)
+        out = self.propagate(edge_index, x=x, size=size)
+        x_r = x[1]
+        if x_r is not None:
+            out = (1 + self.eps) * x_r - out  # subtract instead of add
+        return self.nn(out)
+
+
 def change_params_key(params):
     """
     Change GCC source parameters keys

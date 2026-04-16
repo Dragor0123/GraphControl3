@@ -8,7 +8,7 @@ from .normalize import similarity, get_laplacian_matrix
 
 def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
     save_node_border = 30000
-        
+
     if use_adj:
         # to undirected and remove self-loop
         edges = to_undirected(data.edge_index)
@@ -16,7 +16,7 @@ def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
         tmp = to_dense_adj(edges)[0]
     else:
         tmp = similarity(data.x, data.x)
-        
+
         # discretize the similarity matrix by threshold
         tmp = torch.where(tmp>threshold, 1.0, 0.0)
 
@@ -27,13 +27,112 @@ def obtain_attributes(data, use_adj=False, threshold=0.1, num_dim=32):
         V = torch.from_numpy(V)
     else:
         L, V = torch.linalg.eigh(tmp) # much faster than torch.linalg.eig
-    
+
     x = V[:, :num_dim].float()
     import sklearn.preprocessing as preprocessing
     x = preprocessing.normalize(x.cpu(), norm="l2")
     x = torch.tensor(x, dtype=torch.float32)
 
     return x
+
+
+def obtain_attributes_dissimilarity(data, num_dim=32, dissim_threshold=0.5):
+    """
+    Produce dissimilarity-based condition PE.
+    A'_dissim = edges that exist in original A AND have low cosine similarity (K < dissim_threshold).
+    This selects "real heterophilic edges" as the condition topology.
+
+    Args:
+        data: PyG data object with data.x (original node features) and data.edge_index
+        num_dim: number of eigenvectors to extract (default 32)
+        dissim_threshold: cosine similarity below which an edge is considered dissimilar.
+
+    Returns:
+        x: (N, num_dim) float tensor of Laplacian PE from A'_dissim
+        stats: dict with topology statistics
+    """
+    import sklearn.preprocessing as preprocessing
+
+    X = data.x
+    N = X.size(0)
+    device = X.device
+
+    # Step 1: Cosine similarity matrix
+    K = similarity(X, X)  # (N, N), values in [-1, 1]
+
+    # Step 2: Original adjacency as dense matrix (undirected, no self-loops)
+    edges = to_undirected(data.edge_index)
+    edges, _ = remove_self_loops(edges)
+    A_orig = to_dense_adj(edges, max_num_nodes=N)[0].to(device)  # (N, N)
+
+    # Step 3: A_dissim = low similarity AND exists in original A
+    A_dissim = ((K < dissim_threshold).float()) * A_orig
+
+    # Step 4: Remove self-loops, ensure symmetry
+    A_dissim.fill_diagonal_(0)
+    A_dissim = (A_dissim + A_dissim.T).clamp(max=1.0)
+
+    # Compute topology statistics
+    num_edges_dissim = int(A_dissim.sum().item()) // 2
+    num_edges_orig = int(A_orig.sum().item()) // 2
+    overlap_ratio = num_edges_dissim / max(num_edges_orig, 1)
+    stats = {
+        'num_edges': num_edges_dissim,
+        'num_edges_orig': num_edges_orig,
+        'overlap_ratio': overlap_ratio,
+        'dissim_threshold': dissim_threshold,
+    }
+
+    # Step 5: Handle empty A_dissim — fall back to original obtain_attributes
+    if A_dissim.sum() == 0:
+        print(f"WARNING: A_dissim is empty for dissim_threshold={dissim_threshold}. Falling back to similarity A'.")
+        x = obtain_attributes(data, use_adj=False, threshold=0.17, num_dim=num_dim)
+        stats['fallback'] = True
+        return x, stats
+
+    stats['fallback'] = False
+
+    # Step 6: Normalized Laplacian of A_dissim
+    L_norm = get_laplacian_matrix(A_dissim)
+
+    save_node_border = 30000
+    if N > save_node_border:
+        L, V = scipy.linalg.eigh(L_norm.cpu().numpy())
+        L = torch.from_numpy(L)
+        V = torch.from_numpy(V)
+    else:
+        L, V = torch.linalg.eigh(L_norm)
+
+    # Step 7: Smallest eigenvectors → PE
+    x = V[:, :num_dim].float()
+    x = preprocessing.normalize(x.cpu(), norm="l2")
+    x = torch.tensor(x, dtype=torch.float32)
+
+    return x, stats
+
+
+def compute_condition_homophily(data, x_sim_dense, threshold=None):
+    """
+    Compute edge homophily ratio of the condition graph A'.
+    Homophily ratio = fraction of edges in A' connecting nodes of the same class.
+
+    Args:
+        data: full-graph PyG data with data.y (node labels) and data.x
+        x_sim_dense: (N, N) adjacency matrix of A' (already discretized)
+
+    Returns:
+        homophily_ratio: float
+    """
+    if not hasattr(data, 'y'):
+        return None
+    y = data.y.cpu()
+    N = y.size(0)
+    edges = x_sim_dense.nonzero(as_tuple=False)  # (E, 2)
+    if edges.size(0) == 0:
+        return 0.0
+    src, dst = edges[:, 0], edges[:, 1]
+    same_class = (y[src] == y[dst]).float().mean().item()
+    return same_class
     
 
 def process_attributes(data, use_adj=False, threshold=0.1, num_dim=32, soft=False, kernel=False):
