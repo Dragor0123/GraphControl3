@@ -300,8 +300,12 @@ For each configuration, record:
    - Number of edges in A'
    - Edge homophily ratio of A' (what fraction of edges in A' connect same-class nodes)
    - Overlap ratio: |A' ∩ A| / |A'|
-3. **Spectral diagnostic** (if time permits):
-   - RQ of frozen and control branches (reuse Exp4 logic)
+3. **Spectral diagnostic** (MANDATORY for all 4 configs):
+   - For each config, after fine-tuning, extract `h_frozen` and `h_control` (post zero_conv2) on test subgraphs.
+   - Compute per-subgraph Rayleigh Quotient (RQ) for each branch using the subgraph's normalized Laplacian.
+   - Record: `RQ_frozen_mean`, `RQ_frozen_std`, `RQ_control_mean`, `RQ_control_std`, `RQ_diff = RQ_control_mean - RQ_frozen_mean`.
+   - Reuse Exp4 logic from previous `analyze.py`.
+   - This is essential to answer: "Does anti-smoothing (O1) increase spectral separation between branches?"
 
 ### Phase 4: Analysis (Day 4–5)
 
@@ -341,6 +345,26 @@ Squirrel  | 0.3              | ...    | ...    | ...        | ...
 ...
 ```
 
+**Table 5: Spectral Separation (RQ) across Configs**
+
+```
+Dataset     | Config   | RQ_frozen_mean | RQ_control_mean | RQ_diff | Acc
+Cora_ML     | Baseline | ...            | ...             | ...     | ...
+Cora_ML     | C1       | ...            | ...             | ...     | ...
+Cora_ML     | O1       | ...            | ...             | ...     | ...
+Cora_ML     | C1+O1    | ...            | ...             | ...     | ...
+Squirrel    | Baseline | ...            | ...             | ...     | ...
+Squirrel    | C1       | ...            | ...             | ...     | ...
+Squirrel    | O1       | ...            | ...             | ...     | ...
+Squirrel    | C1+O1    | ...            | ...             | ...     | ...
+... (all 6 datasets)
+```
+
+Key analysis for Table 5:
+- Compare RQ_diff across configs: Does O1 increase RQ_diff compared to Baseline?
+- Correlate RQ_diff with accuracy: Does larger spectral separation correspond to better performance?
+- If RQ_diff increases but accuracy does not, spectral complementarity alone is insufficient.
+
 ---
 
 ## Decision Criteria After Experiments
@@ -362,6 +386,11 @@ After completing the 2×2 matrix, answer these questions:
 4. **How does the best config compare to the oracle?**
    - If close → the proposed unsupervised method is effective.
    - If far → there's room for improvement, consider learnable condition generation.
+
+5. **Does O1 increase spectral separation (RQ_diff) compared to Baseline?**
+   - If yes AND accuracy improves → spectral complementarity is a valid mechanism.
+   - If yes AND accuracy does NOT improve → spectral separation is necessary but not sufficient; the issue is elsewhere (e.g., fusion mechanism, representation quality).
+   - If no → anti-smoothing does not produce the intended spectral effect; operator redesign needs a different approach.
 
 ---
 
