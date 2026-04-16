@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import torch
+import torch.nn.functional as F
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import numpy as np
@@ -183,6 +184,9 @@ def _save_results(config, seed_metrics, condition_stats):
             'combined_acc_std': float(np.std([m['combined_acc'] for m in seed_metrics])),
             'frozen_acc_mean': float(np.mean([m['frozen_acc'] for m in seed_metrics])),
             'control_acc_mean': float(np.mean([m['control_acc'] for m in seed_metrics])),
+            'RQ_frozen_mean': float(np.mean([m['RQ_frozen_mean'] for m in seed_metrics])),
+            'RQ_control_mean': float(np.mean([m['RQ_control_mean'] for m in seed_metrics])),
+            'RQ_diff_mean': float(np.mean([m['RQ_diff'] for m in seed_metrics])),
         },
     }
 
@@ -287,6 +291,7 @@ def main(config):
         # finetuning model
         train_summary = finetune(config, model, train_loader, device, x_sim, test_loader)
         eval_metrics = eval_subgraph_diagnostics(config, model, test_loader, device, x_sim)
+        rq_metrics = eval_rq_diagnostics(config, model, test_loader, device, x_sim)
 
         seed_metrics.append({
             'seed': seed,
@@ -294,6 +299,7 @@ def main(config):
             'best_train_ce': train_summary['best_train_ce'],
             'best_train_l_gain': train_summary['best_train_l_gain'],
             **eval_metrics,
+            **rq_metrics,
         })
         print(
             f"Seed: {seed}, "
@@ -301,7 +307,8 @@ def main(config):
             f"Frozen: {eval_metrics['frozen_acc']:.4f}, "
             f"Control: {eval_metrics['control_acc']:.4f}, "
             f"MeanMarginGain: {eval_metrics['mean_margin_gain']:.4f}, "
-            f"TestLGain: {eval_metrics['mean_test_l_gain']:.4f}"
+            f"TestLGain: {eval_metrics['mean_test_l_gain']:.4f}, "
+            f"RQ_diff: {rq_metrics['RQ_diff']:.4f}"
         )
 
     final_acc = np.mean([m['combined_acc'] for m in seed_metrics])
@@ -341,6 +348,11 @@ def main(config):
             f"{np.mean(train_l_gain_values):.4f}"
             f"±{np.std(train_l_gain_values):.4f}"
         )
+    print(
+        f"# RQ_frozen : {np.mean([m['RQ_frozen_mean'] for m in seed_metrics]):.4f}  "
+        f"RQ_control: {np.mean([m['RQ_control_mean'] for m in seed_metrics]):.4f}  "
+        f"RQ_diff: {np.mean([m['RQ_diff'] for m in seed_metrics]):.4f}"
+    )
 
     _save_results(config, seed_metrics, condition_stats)
 
@@ -414,7 +426,124 @@ def eval_subgraph_diagnostics(config, model, test_loader, device, full_x_sim):
         'mean_test_l_gain': test_l_gain_sum / total_num,
     }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Spectral diagnostic: Rayleigh Quotient (reusing analyze.py Exp4 logic)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _compute_normalized_laplacian(edge_index, num_nodes, device):
+    """Dense normalized Laplacian from sparse edge_index."""
+    if num_nodes == 0:
+        return torch.zeros(0, 0, device=device)
+    if edge_index.shape[1] == 0:
+        return torch.eye(num_nodes, device=device)
+    adj = torch.zeros(num_nodes, num_nodes, device=device)
+    adj[edge_index[0], edge_index[1]] = 1.0
+    adj = (adj + adj.T).clamp(0.0, 1.0)
+    adj.fill_diagonal_(0.0)
+    deg = adj.sum(dim=1).clamp(min=1.0)
+    D_rsqrt = torch.diag(deg.rsqrt())
+    I = torch.eye(num_nodes, device=device)
+    return I - D_rsqrt @ adj @ D_rsqrt
+
+
+def _compute_avg_rq(H_nodes, edge_index, num_nodes):
+    """Average Rayleigh Quotient across feature dims for node representations."""
+    device = H_nodes.device
+    L = _compute_normalized_laplacian(edge_index.to(device), num_nodes, device)
+    rqs = []
+    for d in range(H_nodes.shape[1]):
+        h = H_nodes[:, d]
+        denom = (h @ h).item()
+        if denom > 1e-10:
+            numer = (h @ L @ h).item()
+            rqs.append(numer / denom)
+    return float(np.mean(rqs)) if rqs else 0.0
+
+
+def eval_rq_diagnostics(config, model, test_loader, device, full_x_sim):
+    """
+    Compute per-subgraph Rayleigh Quotient for frozen and control branches.
+    Uses forward hooks on UnsupervisedGIN's last BatchNorm layer to extract
+    node-level representations (replicates analyze.py Exp4 logic).
+    """
+    model.eval()
+    rq_frozen_list = []
+    rq_control_list = []
+    captured = {}
+
+    def make_hook(key):
+        def fn(module, inp, out):
+            captured[key] = out.detach()
+        return fn
+
+    h1 = model.encoder.gnn.batch_norms[-1].register_forward_hook(make_hook('frozen'))
+    h2 = model.trainable_copy.gnn.batch_norms[-1].register_forward_hook(make_hook('control'))
+
+    with torch.no_grad():
+        for batch in test_loader:
+            batch = batch.to(device)
+            if not hasattr(batch, 'root_n_id'):
+                batch.root_n_id = batch.root_n_index
+
+            x_sim = full_x_sim[batch.original_idx]
+
+            # Trigger both hooks via forward_with_diagnostics
+            model.forward_with_diagnostics(
+                batch.x, x_sim, batch.edge_index,
+                batch.batch, batch.root_n_id, frozen=True,
+            )
+
+            # Apply ReLU to match UnsupervisedGIN internals
+            h_fn = F.relu(captured['frozen'])    # (N_total, D)
+            h_cn = F.relu(captured['control'])   # (N_total, D)
+
+            # Split batched nodes back into per-subgraph representations
+            num_graphs = int(batch.batch.max().item()) + 1
+            for g in range(num_graphs):
+                node_mask = batch.batch == g
+                node_idx = node_mask.nonzero(as_tuple=True)[0]
+                num_nodes = node_idx.size(0)
+                if num_nodes < 2:
+                    continue
+
+                # Extract subgraph edges (remap to local indices)
+                edge_mask = node_mask[batch.edge_index[0]] & node_mask[batch.edge_index[1]]
+                local_ei = batch.edge_index[:, edge_mask]
+                idx_map = torch.zeros(batch.num_nodes, dtype=torch.long, device=device)
+                idx_map[node_idx] = torch.arange(num_nodes, device=device)
+                local_ei = idx_map[local_ei]
+
+                rq_f = _compute_avg_rq(h_fn[node_idx], local_ei, num_nodes)
+                rq_c = _compute_avg_rq(h_cn[node_idx], local_ei, num_nodes)
+                rq_frozen_list.append(rq_f)
+                rq_control_list.append(rq_c)
+
+    h1.remove()
+    h2.remove()
+
+    if not rq_frozen_list:
+        return {'RQ_frozen_mean': 0.0, 'RQ_frozen_std': 0.0,
+                'RQ_control_mean': 0.0, 'RQ_control_std': 0.0, 'RQ_diff': 0.0}
+
+    rq_f = np.array(rq_frozen_list)
+    rq_c = np.array(rq_control_list)
+    diff = rq_c - rq_f  # positive → control is higher-frequency than frozen
+
+    print(
+        f"  RQ Frozen : {rq_f.mean():.4f} ± {rq_f.std():.4f}  "
+        f"RQ Control: {rq_c.mean():.4f} ± {rq_c.std():.4f}  "
+        f"RQ_diff: {diff.mean():.4f}"
+    )
+    return {
+        'RQ_frozen_mean': float(rq_f.mean()),
+        'RQ_frozen_std': float(rq_f.std()),
+        'RQ_control_mean': float(rq_c.mean()),
+        'RQ_control_std': float(rq_c.std()),
+        'RQ_diff': float(diff.mean()),
+    }
+
+
 if __name__ == '__main__':
     config = Arguments().parse_args()
-    
+
     main(config)

@@ -127,7 +127,7 @@ def compute_condition_homophily(data, x_sim_dense, threshold=None):
         return None
     y = data.y.cpu()
     N = y.size(0)
-    edges = x_sim_dense.nonzero(as_tuple=False)  # (E, 2)
+    edges = x_sim_dense.nonzero(as_tuple=False).cpu()  # (E, 2)
     if edges.size(0) == 0:
         return 0.0
     src, dst = edges[:, 0], edges[:, 1]

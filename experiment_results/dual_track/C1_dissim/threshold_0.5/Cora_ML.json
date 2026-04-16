@@ -1,0 +1,49 @@
+{
+  "config": {
+    "dataset": "Cora_ML",
+    "seeds": [
+      0
+    ],
+    "condition_mode": "dissimilarity",
+    "dissim_threshold": 0.5,
+    "operator_mode": "standard",
+    "epochs": 5,
+    "lr": 0.001,
+    "threshold": 0.17
+  },
+  "condition_stats": {
+    "num_edges": 8067,
+    "num_edges_orig": 8158,
+    "overlap_ratio": 0.9888453052218681,
+    "dissim_threshold": 0.5,
+    "fallback": false,
+    "homophily_ratio": 0.786537766456604
+  },
+  "seed_metrics": [
+    {
+      "seed": 0,
+      "best_acc": 0.18397626112759644,
+      "best_train_ce": 1.9270004431406658,
+      "best_train_l_gain": null,
+      "frozen_acc": 0.12759643916913946,
+      "control_acc": 0.11646884272997032,
+      "combined_acc": 0.18397626112759644,
+      "mean_margin_gain": 0.015091279040723597,
+      "mean_test_l_gain": 0.01229569356258439,
+      "RQ_frozen_mean": 0.2012687998986485,
+      "RQ_frozen_std": 0.14429885848533427,
+      "RQ_control_mean": 0.22612476628468295,
+      "RQ_control_std": 0.10042440498402415,
+      "RQ_diff": 0.024855966386034434
+    }
+  ],
+  "summary": {
+    "combined_acc_mean": 0.18397626112759644,
+    "combined_acc_std": 0.0,
+    "frozen_acc_mean": 0.12759643916913946,
+    "control_acc_mean": 0.11646884272997032,
+    "RQ_frozen_mean": 0.2012687998986485,
+    "RQ_control_mean": 0.22612476628468295,
+    "RQ_diff_mean": 0.024855966386034434
+  }
+}
