@@ -2,13 +2,17 @@
   "config": {
     "dataset": "Cora_ML",
     "seeds": [
-      0
+      0,
+      1,
+      2,
+      3,
+      4
     ],
     "condition_mode": "dissimilarity",
     "dissim_threshold": 0.5,
     "operator_mode": "standard",
-    "epochs": 5,
-    "lr": 0.001,
+    "epochs": 200,
+    "lr": 0.5,
     "threshold": 0.17
   },
   "condition_stats": {
@@ -22,28 +26,92 @@
   "seed_metrics": [
     {
       "seed": 0,
-      "best_acc": 0.18397626112759644,
-      "best_train_ce": 1.9270004431406658,
+      "best_acc": 0.29043026706231456,
+      "best_train_ce": 1.8280480305353801,
       "best_train_l_gain": null,
-      "frozen_acc": 0.12759643916913946,
-      "control_acc": 0.11646884272997032,
-      "combined_acc": 0.18397626112759644,
-      "mean_margin_gain": 0.015091279040723597,
-      "mean_test_l_gain": 0.01229569356258439,
-      "RQ_frozen_mean": 0.2012687998986485,
-      "RQ_frozen_std": 0.14429885848533427,
-      "RQ_control_mean": 0.22612476628468295,
-      "RQ_control_std": 0.10042440498402415,
-      "RQ_diff": 0.024855966386034434
+      "frozen_acc": 0.15281899109792285,
+      "control_acc": 0.28672106824925814,
+      "combined_acc": 0.29043026706231456,
+      "mean_margin_gain": 1.7182101428685628,
+      "mean_test_l_gain": 0.45309396826548815,
+      "RQ_frozen_mean": 0.20148912366309635,
+      "RQ_frozen_std": 0.14431558830596095,
+      "RQ_control_mean": 0.33698174903904987,
+      "RQ_control_std": 0.18771666451973237,
+      "RQ_diff": 0.13549262537595352
+    },
+    {
+      "seed": 1,
+      "best_acc": 0.29636498516320475,
+      "best_train_ce": 1.7712732156117756,
+      "best_train_l_gain": null,
+      "frozen_acc": 0.11498516320474778,
+      "control_acc": 0.2870919881305638,
+      "combined_acc": 0.29636498516320475,
+      "mean_margin_gain": 1.1836638960003498,
+      "mean_test_l_gain": 0.1568164707821979,
+      "RQ_frozen_mean": 0.2033994248419543,
+      "RQ_frozen_std": 0.14437201001889802,
+      "RQ_control_mean": 0.32103535487755525,
+      "RQ_control_std": 0.22714800234635876,
+      "RQ_diff": 0.11763593003560092
+    },
+    {
+      "seed": 2,
+      "best_acc": 0.2956231454005935,
+      "best_train_ce": 2.2067808310190835,
+      "best_train_l_gain": null,
+      "frozen_acc": 0.2882047477744807,
+      "control_acc": 0.2882047477744807,
+      "combined_acc": 0.2956231454005935,
+      "mean_margin_gain": 0.36503182568252973,
+      "mean_test_l_gain": 0.0764956317775681,
+      "RQ_frozen_mean": 0.20363750388640256,
+      "RQ_frozen_std": 0.14490710861552805,
+      "RQ_control_mean": 0.4854337710457204,
+      "RQ_control_std": 0.31806116634292614,
+      "RQ_diff": 0.2817962671593178
+    },
+    {
+      "seed": 3,
+      "best_acc": 0.288946587537092,
+      "best_train_ce": 1.8000510931015015,
+      "best_train_l_gain": null,
+      "frozen_acc": 0.28560830860534125,
+      "control_acc": 0.28301186943620177,
+      "combined_acc": 0.288946587537092,
+      "mean_margin_gain": 1.4338741930372991,
+      "mean_test_l_gain": 0.5196981999569902,
+      "RQ_frozen_mean": 0.2041738988517853,
+      "RQ_frozen_std": 0.1439267181040877,
+      "RQ_control_mean": 0.3566012712380592,
+      "RQ_control_std": 0.247759845192326,
+      "RQ_diff": 0.15242737238627388
+    },
+    {
+      "seed": 4,
+      "best_acc": 0.29080118694362017,
+      "best_train_ce": 5.271514256795247,
+      "best_train_l_gain": null,
+      "frozen_acc": 0.13649851632047477,
+      "control_acc": 0.29043026706231456,
+      "combined_acc": 0.29080118694362017,
+      "mean_margin_gain": -1.5051616858304078,
+      "mean_test_l_gain": 2.955468272596863,
+      "RQ_frozen_mean": 0.20101558306074302,
+      "RQ_frozen_std": 0.14511970006140507,
+      "RQ_control_mean": 0.023686285769946438,
+      "RQ_control_std": 0.1405304293684703,
+      "RQ_diff": -0.17732929729079658
     }
   ],
   "summary": {
-    "combined_acc_mean": 0.18397626112759644,
-    "combined_acc_std": 0.0,
-    "frozen_acc_mean": 0.12759643916913946,
-    "control_acc_mean": 0.11646884272997032,
-    "RQ_frozen_mean": 0.2012687998986485,
-    "RQ_control_mean": 0.22612476628468295,
-    "RQ_diff_mean": 0.024855966386034434
+    "combined_acc_mean": 0.29243323442136504,
+    "combined_acc_std": 0.0029821589380180625,
+    "frozen_acc_mean": 0.19562314540059345,
+    "control_acc_mean": 0.2870919881305638,
+    "RQ_frozen_mean": 0.20274310686079627,
+    "RQ_control_mean": 0.30474768639406624,
+    "RQ_diff_mean": 0.10200457953326991
   }
 }
